@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { HUE_SHIFT_MIN_DEG } from '../constants.js';
+import {
+  AGENTS_MODAL_AVATAR_ZOOM,
+  HUE_SHIFT_MIN_DEG,
+  HUE_SHIFT_SLIDER_MAX_DEG,
+  HUE_SHIFT_SLIDER_MIN_DEG,
+} from '../constants.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import {
   getCharacterSprites,
@@ -20,8 +25,6 @@ interface AgentsModalProps {
   agentStatuses: Record<number, string>;
   agentTools: Record<number, ToolActivity[]>;
 }
-
-const AVATAR_PREVIEW_ZOOM = 3;
 
 function drawSpriteToCanvas(canvas: HTMLCanvasElement, sprite: SpriteData, zoom: number): void {
   const rows = sprite.length;
@@ -45,7 +48,7 @@ function drawSpriteToCanvas(canvas: HTMLCanvasElement, sprite: SpriteData, zoom:
 function AvatarPreview({
   palette,
   hueShift,
-  zoom = AVATAR_PREVIEW_ZOOM,
+  zoom = AGENTS_MODAL_AVATAR_ZOOM,
 }: {
   palette: number;
   hueShift: number;
@@ -164,7 +167,7 @@ export function AgentsModal({
               >
                 <div className="shrink-0 w-12 h-18 flex items-end justify-center">
                   {ch ? (
-                    <AvatarPreview palette={palette} hueShift={hueShift} zoom={2} />
+                    <AvatarPreview palette={palette} hueShift={hueShift} />
                   ) : (
                     <span className="text-text-muted text-xs">?</span>
                   )}
@@ -214,7 +217,6 @@ export function AgentsModal({
                           <AvatarPreview
                             palette={idx}
                             hueShift={isSelected ? hueShift : 0}
-                            zoom={2}
                           />
                         </button>
                       );
@@ -225,8 +227,8 @@ export function AgentsModal({
                     <label className="text-xs text-text-muted shrink-0">Hue shift</label>
                     <input
                       type="range"
-                      min={0}
-                      max={359}
+                      min={HUE_SHIFT_SLIDER_MIN_DEG}
+                      max={HUE_SHIFT_SLIDER_MAX_DEG}
                       value={hueShift}
                       onChange={(e) => handleHueShiftChange(id, Number(e.target.value))}
                       onMouseUp={handleHueShiftCommit}
@@ -239,7 +241,7 @@ export function AgentsModal({
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        handleHueShiftChange(id, 0);
+                        handleHueShiftChange(id, HUE_SHIFT_SLIDER_MIN_DEG);
                         handleHueShiftCommit();
                       }}
                       title="Reset hue"
