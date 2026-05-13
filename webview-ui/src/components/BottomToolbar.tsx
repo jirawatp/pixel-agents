@@ -11,6 +11,8 @@ interface BottomToolbarProps {
   onToggleEditMode: () => void;
   isSettingsOpen: boolean;
   onToggleSettings: () => void;
+  isAgentsOpen: boolean;
+  onToggleAgents: () => void;
   workspaceFolders: WorkspaceFolder[];
 }
 
@@ -20,6 +22,8 @@ export function BottomToolbar({
   onToggleEditMode,
   isSettingsOpen,
   onToggleSettings,
+  isAgentsOpen,
+  onToggleAgents,
   workspaceFolders,
 }: BottomToolbarProps) {
   const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
@@ -122,6 +126,13 @@ export function BottomToolbar({
         title="Edit office layout"
       >
         Layout
+      </Button>
+      <Button
+        variant={isAgentsOpen ? 'active' : 'default'}
+        onClick={onToggleAgents}
+        title="Manage agents"
+      >
+        Agents
       </Button>
       <Button
         variant={isSettingsOpen ? 'active' : 'default'}
