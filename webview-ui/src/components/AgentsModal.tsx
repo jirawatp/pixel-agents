@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -5,6 +6,9 @@ import {
   HUE_SHIFT_MIN_DEG,
   HUE_SHIFT_SLIDER_MAX_DEG,
   HUE_SHIFT_SLIDER_MIN_DEG,
+  MAX_CONTEXT_TOKENS,
+  TEAM_LEAD_COLOR,
+  TEAM_ROLE_COLOR,
 } from '../constants.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import {
@@ -64,14 +68,18 @@ function AvatarPreview({
   return <canvas ref={canvasRef} className="block" style={{ imageRendering: 'pixelated' }} />;
 }
 
-function getAgentLabel(ch: Character | undefined, id: number): string {
+function getDisplayName(ch: Character | undefined, id: number): string {
   if (!ch) return `Agent ${id}`;
-  if (ch.teamName && ch.agentName) {
-    return `${ch.teamName} · ${ch.agentName}`;
-  }
   if (ch.agentName) return ch.agentName;
   if (ch.folderName) return ch.folderName;
   return `Agent ${id}`;
+}
+
+function getRoleLabel(ch: Character | undefined): string | null {
+  if (!ch) return null;
+  if (ch.isTeamLead) return 'LEAD';
+  if (ch.agentName) return ch.agentName;
+  return null;
 }
 
 function getAgentStatusLabel(
@@ -87,6 +95,11 @@ function getAgentStatusLabel(
   return 'Idle';
 }
 
+function formatTokens(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k`;
+  return `${n}`;
+}
+
 function persistSeats(officeState: OfficeState): void {
   const seats: Record<number, { palette: number; hueShift: number; seatId: string | null }> = {};
   for (const ch of officeState.characters.values()) {
@@ -94,6 +107,15 @@ function persistSeats(officeState: OfficeState): void {
     seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId };
   }
   vscode.postMessage({ type: 'saveAgentSeats', seats });
+}
+
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-6 py-1">
+      <span className="text-xs text-text-muted w-22 shrink-0">{label}</span>
+      <span className="text-xs text-text break-words min-w-0 flex-1">{children}</span>
+    </div>
+  );
 }
 
 export function AgentsModal({
@@ -153,11 +175,20 @@ export function AgentsModal({
         {sortedIds.map((id) => {
           const ch = officeState.characters.get(id);
           const isExpanded = expandedId === id;
-          const label = getAgentLabel(ch, id);
+          const displayName = getDisplayName(ch, id);
+          const roleLabel = getRoleLabel(ch);
           const statusLabel = getAgentStatusLabel(ch, agentStatuses[id], agentTools[id]);
           const palette = ch?.palette ?? 0;
           const hueShift = ch?.hueShift ?? 0;
           const seatLabel = ch?.seatId ? 'Seated' : 'Wandering';
+
+          const tools = agentTools[id] ?? [];
+          const activeTool = tools.find((t) => !t.done);
+          const recentTools = tools.slice(-5).reverse();
+          const inputTokens = ch?.inputTokens ?? 0;
+          const outputTokens = ch?.outputTokens ?? 0;
+          const totalTokens = inputTokens + outputTokens;
+          const contextPct = Math.round((totalTokens / MAX_CONTEXT_TOKENS) * 100);
 
           return (
             <div key={id} className="border-b border-border last:border-b-0">
@@ -173,8 +204,20 @@ export function AgentsModal({
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-4">
-                    <span className="text-text text-base truncate">{label}</span>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-text text-base truncate">{displayName}</span>
+                    {roleLabel && (
+                      <span
+                        className="text-2xs px-3 py-1 border-2 leading-none"
+                        style={{
+                          color: ch?.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
+                          borderColor: ch?.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
+                          fontWeight: ch?.isTeamLead ? 'bold' : undefined,
+                        }}
+                      >
+                        {roleLabel}
+                      </span>
+                    )}
                     <span className="text-text-muted text-xs">#{id}</span>
                   </div>
                   <div className="text-text-muted text-xs truncate">
@@ -198,60 +241,110 @@ export function AgentsModal({
               </div>
 
               {isExpanded && ch && (
-                <div className="py-6 px-10 bg-btn-bg/50">
-                  <div className="text-xs text-text-muted mb-4">Avatar</div>
-                  <div className="flex items-center gap-6 mb-6 flex-wrap">
-                    {Array.from({ length: paletteCount }).map((_, idx) => {
-                      const isSelected = idx === palette;
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handlePaletteChange(id, idx)}
-                          className={`p-2 border-2 ${
-                            isSelected
-                              ? 'border-accent bg-active-bg'
-                              : 'border-transparent hover:border-border'
-                          } cursor-pointer rounded-none bg-bg`}
-                          title={`Skin ${idx + 1}`}
+                <div className="py-6 px-10 bg-btn-bg/50 flex flex-col gap-10">
+                  <section>
+                    <div className="text-xs text-accent-bright mb-4 uppercase tracking-wide">
+                      Details
+                    </div>
+                    <DetailRow label="Name">{displayName}</DetailRow>
+                    {ch.teamName && <DetailRow label="Team">{ch.teamName}</DetailRow>}
+                    {roleLabel && (
+                      <DetailRow label="Role">
+                        <span
+                          style={{
+                            color: ch.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
+                            fontWeight: ch.isTeamLead ? 'bold' : undefined,
+                          }}
                         >
-                          <AvatarPreview
-                            palette={idx}
-                            hueShift={isSelected ? hueShift : 0}
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
+                          {roleLabel}
+                        </span>
+                        {ch.leadAgentId !== undefined && !ch.isTeamLead && (
+                          <span className="text-text-muted"> · reports to #{ch.leadAgentId}</span>
+                        )}
+                      </DetailRow>
+                    )}
+                    {ch.folderName && <DetailRow label="Workspace">{ch.folderName}</DetailRow>}
+                    <DetailRow label="Status">{statusLabel}</DetailRow>
+                    <DetailRow label="Seat">
+                      {ch.seatId ? `Assigned (${ch.seatId})` : 'Wandering'}
+                    </DetailRow>
+                    {activeTool && (
+                      <DetailRow label="Current">
+                        <span className="text-accent">{activeTool.status}</span>
+                      </DetailRow>
+                    )}
+                    {recentTools.length > 0 && (
+                      <DetailRow label="Recent">
+                        {recentTools
+                          .map((t) => t.status.split(':')[0].trim() || t.status)
+                          .join(' · ')}
+                      </DetailRow>
+                    )}
+                    {totalTokens > 0 && (
+                      <DetailRow label="Tokens">
+                        {formatTokens(inputTokens)} in / {formatTokens(outputTokens)} out
+                        <span className="text-text-muted"> · {contextPct}% of context</span>
+                      </DetailRow>
+                    )}
+                  </section>
 
-                  <div className="flex items-center gap-6">
-                    <label className="text-xs text-text-muted shrink-0">Hue shift</label>
-                    <input
-                      type="range"
-                      min={HUE_SHIFT_SLIDER_MIN_DEG}
-                      max={HUE_SHIFT_SLIDER_MAX_DEG}
-                      value={hueShift}
-                      onChange={(e) => handleHueShiftChange(id, Number(e.target.value))}
-                      onMouseUp={handleHueShiftCommit}
-                      onTouchEnd={handleHueShiftCommit}
-                      onKeyUp={handleHueShiftCommit}
-                      className="flex-1"
-                    />
-                    <span className="text-xs text-text-muted w-12 text-right">{hueShift}°</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        handleHueShiftChange(id, HUE_SHIFT_SLIDER_MIN_DEG);
-                        handleHueShiftCommit();
-                      }}
-                      title="Reset hue"
-                    >
-                      Reset
-                    </Button>
-                  </div>
-                  <div className="text-xs text-text-muted mt-4">
-                    Tip: values ≥ {HUE_SHIFT_MIN_DEG}° are used automatically when palettes repeat.
-                  </div>
+                  <section>
+                    <div className="text-xs text-accent-bright mb-4 uppercase tracking-wide">
+                      Avatar
+                    </div>
+                    <div className="flex items-center gap-6 mb-6 flex-wrap">
+                      {Array.from({ length: paletteCount }).map((_, idx) => {
+                        const isSelected = idx === palette;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handlePaletteChange(id, idx)}
+                            className={`p-2 border-2 ${
+                              isSelected
+                                ? 'border-accent bg-active-bg'
+                                : 'border-transparent hover:border-border'
+                            } cursor-pointer rounded-none bg-bg`}
+                            title={`Skin ${idx + 1}`}
+                          >
+                            <AvatarPreview
+                              palette={idx}
+                              hueShift={isSelected ? hueShift : 0}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                      <label className="text-xs text-text-muted shrink-0">Hue shift</label>
+                      <input
+                        type="range"
+                        min={HUE_SHIFT_SLIDER_MIN_DEG}
+                        max={HUE_SHIFT_SLIDER_MAX_DEG}
+                        value={hueShift}
+                        onChange={(e) => handleHueShiftChange(id, Number(e.target.value))}
+                        onMouseUp={handleHueShiftCommit}
+                        onTouchEnd={handleHueShiftCommit}
+                        onKeyUp={handleHueShiftCommit}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-text-muted w-12 text-right">{hueShift}°</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          handleHueShiftChange(id, HUE_SHIFT_SLIDER_MIN_DEG);
+                          handleHueShiftCommit();
+                        }}
+                        title="Reset hue"
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                    <div className="text-xs text-text-muted mt-4">
+                      Tip: values ≥ {HUE_SHIFT_MIN_DEG}° are used automatically when palettes repeat.
+                    </div>
+                  </section>
                 </div>
               )}
             </div>
