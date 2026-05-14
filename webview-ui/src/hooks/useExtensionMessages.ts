@@ -99,7 +99,7 @@ export function useExtensionMessages(
   const [externalAssetDirectories, setExternalAssetDirectories] = useState<string[]>([]);
   const [lastSeenVersion, setLastSeenVersion] = useState('');
   const [extensionVersion, setExtensionVersion] = useState('');
-  const [watchAllSessions, setWatchAllSessions] = useState(false);
+  const [watchAllSessions, setWatchAllSessions] = useState(true);
   const [alwaysShowLabels, setAlwaysShowLabels] = useState(false);
   const [hooksEnabled, setHooksEnabled] = useState(true);
   const [hooksInfoShown, setHooksInfoShown] = useState(true);
