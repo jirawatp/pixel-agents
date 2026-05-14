@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { toMajorMinor } from './changelogData.js';
+import { AgentsModal } from './components/AgentsModal.js';
 import { BottomToolbar } from './components/BottomToolbar.js';
 import { ChangelogModal } from './components/ChangelogModal.js';
 import { DebugView } from './components/DebugView.js';
@@ -79,6 +80,7 @@ function App() {
 
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAgentsOpen, setIsAgentsOpen] = useState(false);
   const [isHooksInfoOpen, setIsHooksInfoOpen] = useState(false);
   const [hooksTooltipDismissed, setHooksTooltipDismissed] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
@@ -325,7 +327,18 @@ function App() {
         onToggleEditMode={editor.handleToggleEditMode}
         isSettingsOpen={isSettingsOpen}
         onToggleSettings={() => setIsSettingsOpen((v) => !v)}
+        isAgentsOpen={isAgentsOpen}
+        onToggleAgents={() => setIsAgentsOpen((v) => !v)}
         workspaceFolders={workspaceFolders}
+      />
+
+      <AgentsModal
+        isOpen={isAgentsOpen}
+        onClose={() => setIsAgentsOpen(false)}
+        officeState={officeState}
+        agents={agents}
+        agentStatuses={agentStatuses}
+        agentTools={agentTools}
       />
 
       <VersionIndicator
